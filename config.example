@@ -1,0 +1,17 @@
+# EasyDynDNS example configuration (fake values).
+# Copy to ~/.config/easydyndns/config and edit. Never commit your real config.
+
+# Zone ID: Cloudflare dashboard > your domain > Overview > "API" box (right column)
+zone_id = 00000000000000000000000000000000
+# DNS name that will hold one A/AAAA record per active public IP
+record_name = home.example.com
+# Delete an IP after this long without any sign of life (s, m, h, d)
+retention = 12h
+# How often to check (the app also checks immediately on network change and wake)
+interval = 5m
+# Only rewrite the last-seen comment when it is older than this
+refresh_after = 15m
+# TTL of created records in seconds (60 minimum, 1 = auto)
+ttl = 60
+# Label stored in the record comment (defaults to this Mac's local host name)
+# host = my-laptop
