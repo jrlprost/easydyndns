@@ -28,7 +28,7 @@ struct MenuContent: View {
             Text("Last successful sync: " + last.formatted(date: .omitted, time: .shortened))
         }
         Divider()
-        Button("Sync now") { model.trigger() }.disabled(!model.enabled || model.running)
+        Button("Sync now") { model.trigger(force: true) }.disabled(!model.enabled || model.running)
         Toggle("Enabled", isOn: $model.enabled)
         Toggle("Launch at login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
         Divider()
@@ -45,7 +45,7 @@ final class AppModel: ObservableObject {
     @Published var enabled: Bool {
         didSet {
             UserDefaults.standard.set(enabled, forKey: "enabled")
-            if enabled { trigger() }
+            if enabled { trigger(force: true) }
         }
     }
     @Published private(set) var running = false
@@ -57,6 +57,7 @@ final class AppModel: ObservableObject {
     private var timer: Timer?
     private var interval: TimeInterval = 0
     private var pending: Task<Void, Never>?
+    private var lastRun: Date?
     private let monitor = NWPathMonitor()
 
     init() {
@@ -109,8 +110,10 @@ final class AppModel: ObservableObject {
     }
 
     /// Schedules a sync, coalescing bursts of events (network flaps, wake, timer).
-    func trigger(after delay: TimeInterval = 0) {
+    /// Automatic triggers are ignored within 30 s of the previous sync; `force` bypasses that.
+    func trigger(after delay: TimeInterval = 0, force: Bool = false) {
         guard enabled else { return }
+        if !force, let lastRun, Date().timeIntervalSince(lastRun) < 30 { return }
         pending?.cancel()
         pending = Task { [weak self] in
             if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
@@ -124,6 +127,7 @@ final class AppModel: ObservableObject {
         running = true
         let result = await Engine.run()
         running = false
+        lastRun = Date()
         lastResult = result
         if result.succeeded { lastSuccess = Date() }
         recordName = (try? Config.load())?.recordName
@@ -165,7 +169,7 @@ final class AppModel: ObservableObject {
         guard !token.isEmpty else { return }
         do {
             try Keychain.saveToken(token)
-            trigger()
+            trigger(force: true)
         } catch {
             let failure = NSAlert(error: error)
             failure.runModal()
