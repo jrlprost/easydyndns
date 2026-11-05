@@ -41,7 +41,7 @@ Download the latest notarized `EasyDynDNS-x.y.z.zip` from the [Releases](../../r
 Or build it from source (Xcode or the Command Line Tools required):
 
 ```bash
-git clone https://github.com/<you>/easydyndns.git
+git clone https://github.com/jrlprost/easydyndns.git
 cd easydyndns
 scripts/build.sh
 cp -R build/EasyDynDNS.app /Applications/
