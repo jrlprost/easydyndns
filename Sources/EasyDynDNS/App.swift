@@ -58,6 +58,7 @@ final class AppModel: ObservableObject {
     private var interval: TimeInterval = 0
     private var pending: Task<Void, Never>?
     private var lastRun: Date?
+    private var rerunRequested = false
     private let monitor = NWPathMonitor()
 
     init() {
@@ -114,19 +115,25 @@ final class AppModel: ObservableObject {
     func trigger(after delay: TimeInterval = 0, force: Bool = false) {
         guard enabled else { return }
         if !force, let lastRun, Date().timeIntervalSince(lastRun) < 30 { return }
+        // A sync already in flight is never interrupted (a cancelled request can still
+        // have been applied by Cloudflare); ask for one more pass once it finishes instead.
+        if running { rerunRequested = true; return }
         pending?.cancel()
         pending = Task { [weak self] in
             if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
             guard !Task.isCancelled else { return }
-            await self?.sync()
+            // Unstructured task: cancelling `pending` later cannot cancel the sync itself.
+            Task { @MainActor [weak self] in await self?.sync() }
         }
     }
 
     private func sync() async {
         guard enabled, !running else { return }
         running = true
+        rerunRequested = false
         let result = await Engine.run()
         running = false
+        if rerunRequested { trigger(after: 3, force: true) }
         lastRun = Date()
         lastResult = result
         if result.succeeded { lastSuccess = Date() }
